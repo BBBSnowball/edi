@@ -1,0 +1,14 @@
+[submodule "apps/soundboard/files"]
+	path = apps/soundboard/files
+	url = git@git.c3pb.de:c3pb/soundboard_files.git
+[submodule "conf/apps"]
+	path = conf/apps
+	url = git@git.c3pb.de:irq0/edi-conf-subraum.git
+	branch = apps
+[submodule "conf/env"]
+	path = conf/env
+	url = git@git.c3pb.de:irq0/edi-conf-subraum.git
+	branch = env
+[submodule "apps/tts-barbershop"]
+	path = apps/tts-barbershop
+	url = git@git.c3pb.de:irq0/tts-barbershop.git
