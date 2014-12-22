@@ -1,6 +1,7 @@
 #!/bin/bash
 
-MPLAYER="mplayer -vo null -really-quiet"
+#MPLAYER="mplayer -vo null -really-quiet"
+MPLAYER="mpv -vo null --ao=pulse::rtp --really-quiet"
 
 tempfile () {
     tmp=$(mktemp -t XXXXXX)
