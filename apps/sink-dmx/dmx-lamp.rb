@@ -36,9 +36,9 @@ end
 class DmxControl
   def initialize
     if $debug then
-      @serial = SerialDummy.new("/dev/dmx", 38400)
+      @serial = SerialDummy.new(ENV.fetch("EDI_DMX_DEV", "/dev/dmx"), 38400)
     else
-      @serial = SerialPort.new("/dev/dmx", 38400)
+      @serial = SerialPort.new(ENV.fetch("EDI_DMX_DEV", "/dev/dmx"),38400)
     end
     @sema = Mutex.new #semaphore die @serial schützt
     @channels = {}
