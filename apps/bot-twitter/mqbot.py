@@ -108,6 +108,8 @@ class MQ(Thread):
         return flags
 
     def twitter_send(self, msg, user, target):
+        if target == 'timeline' and user is not None:
+            msg = "@%s: %s" % (user, msg)
         if len(msg) <= 140:
             if target == 'timeline':
                 self.bot.tweet(msg)
