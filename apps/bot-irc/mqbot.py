@@ -139,7 +139,6 @@ class MQ(Thread):
         for chan_key in config["channels"]:
             dest = dest.replace(chan_key, config["channels"][chan_key])
 
-        is_msg_short = len(msg) < 120
         is_channel_user_msg = (user != None and
                                dest in config["channels"].values() and
                                user not in config["channels"].values())
@@ -149,13 +148,11 @@ class MQ(Thread):
         is_dest_unknown = (user == None and
                            dest == self.bot.nickname)
 
-        log.debug("SEND: user=%r dest=%r msg=%r msg_short=%r channel_user_msg=%r bot_user_msg=%r dest_unk=%r",
-                  user, dest, msg, is_msg_short, is_channel_user_msg, is_bot_user_msg, is_dest_unknown)
+        log.debug("SEND: user=%r dest=%r msg=%r channel_user_msg=%r bot_user_msg=%r dest_unk=%r",
+                  user, dest, msg, is_channel_user_msg, is_bot_user_msg, is_dest_unknown)
 
-        if is_channel_user_msg and is_msg_short:
+        if is_channel_user_msg:
             self.irc_send_msg(dest, u"{}: {}".format(user, msg))
-        elif is_channel_user_msg:
-            self.irc_send_notice(user, msg)
         elif is_bot_user_msg:
             self.irc_send_msg(user, msg)
         elif is_dest_unknown:
@@ -168,13 +165,13 @@ class MQ(Thread):
         dest= dest.encode("utf-8")
 
         lines = msg.split("\n")
-        send_at_a_time = 120
+        send_at_a_time = 400
 
         # if we have multi-line content assume that each line doesn't hit the IRC server's limit
         if len(lines) > 1:
             send_at_a_time = None
         else:
-            send_at_a_time = 120
+            send_at_a_time = 400
 
         for line in lines:
             log.debug("SEND: dest=%r line=%r", dest, line)
