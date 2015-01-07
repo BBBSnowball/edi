@@ -31,10 +31,15 @@ def write_memory():
         json.dump(MEMORY, f)
 
 def publish(src, user, message):
-    edi.emit.msg_reply(e.chan,
-                       src=src,
-                       user=user,
-                       msg=message)
+    if user:
+        edi.emit.msg_reply(e.chan,
+                           src=src,
+                           user=user,
+                           msg=message)
+    else:
+        edi.emit.msg_reply(e.chan,
+                           src=src,
+                           msg=message)
 
 def add_rss(src, user, alias, url):
     in_channel = src.split('.')[1] != src.split('.')[3]
@@ -113,7 +118,9 @@ def update():
         for alias in MEMORY[ident].keys():
             feed = rss_check(MEMORY[ident][alias]['url'])
             src = MEMORY[ident][alias]['src']
-            user = MEMORY[ident][alias]['user']
+            in_channel = src.split('.')[1] != src.split('.')[3]
+            if in_channel: user = None
+            else: user = MEMORY[ident][alias]['user']
 
             if not feed:
                 to_send = "Uh.. I couldn't get %s for you." % (alias)
