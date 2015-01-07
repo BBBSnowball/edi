@@ -1,0 +1,7 @@
+#!/bin/sh
+
+name="rss"
+dir="${LOGDIR}/${name}"
+
+mkdir -p "${dir}"
+exec svlogd -tt "${dir}"
