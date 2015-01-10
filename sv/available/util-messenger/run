@@ -1,0 +1,15 @@
+#!/bin/sh
+
+exec 2>&1
+
+export PATH="${PATH}:/usr/games"
+
+exec chpst -e "$ENVDIR" \
+     listen_command \
+     --cmd msg \
+     --cmd tweet \
+     --name messenger_util \
+     --description "Send message through EDI msg bots" \
+     --exe ${APPDIR}/utils/msg.sh \
+     --data onlyargs \
+     --autoreply
