@@ -3,7 +3,7 @@
 case "$1" in
 
     start)
-	emit_cmd act dmx all background
+	emit_cmd act dmx all backgrounda
 	;;
 
     stop)
