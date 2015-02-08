@@ -1,0 +1,9 @@
+#!/bin/bash
+
+jingle="digga_boom_long.mp3"
+
+if [ "$(echo $RANDOM | cut -c1)" -ge 6 ]; then
+	jingle="atemnot_kurz.mp3"
+fi
+
+emit_cmd sob "${jingle}"
