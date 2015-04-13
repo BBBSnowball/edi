@@ -1,0 +1,11 @@
+#!/bin/bash
+
+
+case "$1" in
+        start)
+                /usr/bin/wakeonlan 00:19:99:6a:cd:4e
+                ;;
+        stop)
+                /usr/bin/ssh root@hansel poweroff
+                ;;
+esac
