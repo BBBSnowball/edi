@@ -1,0 +1,4 @@
+#!/bin/bash
+
+emit_cmd tts --voice lea hallo herhde
+emit_cmd tts --voice klaus Es heisst Herr Hah Deh Eh, und Henrik ohne Deh.
