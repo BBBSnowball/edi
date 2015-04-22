@@ -76,10 +76,10 @@ def wrap_fudge_msg_args(f):
     @wraps(f)
     def wrapper(msg):
         if msg.properties["content_type"] == "application/json":
-            d = json.loads(msg.body)
+            d = json.loads(msg.body.decode("utf-8"))
             d["rkey"] = msg.routing_key
         elif msg.properties["content_type"] == "text/plain":
-            d = {"msg" : msg.body,
+            d = {"msg" : msg.body.decode("utf-8"),
                  "rkey" : msg.routing_key,}
 
         f(**d)
