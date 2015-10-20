@@ -34,15 +34,15 @@ def make_cmd_exec(chan, app, autoreply=True):
         log.debug("do_exec data: %r", data)
         log.debug("using output formatter %r", output_formatter)
 
-        stdin = output_formatter(data)
+        stdin = output_formatter(data).encode("utf-8")
 
         data_r, data_w = os.pipe()
         log.debug("Using data FDs: r=%r w=%r", data_r, data_w)
 
         env = os.environ
-        env["EDI_CMD"] = data["cmd"]
-        env["EDI_USER"] = data.get("user", "") or ""
-        env["EDI_CMD_ARGS"] = data.get("args", "") or ""
+        env["EDI_CMD"] = data["cmd"].encode("utf-8")
+        env["EDI_USER"] = data.get("user", "").encode("utf-8") or ""
+        env["EDI_CMD_ARGS"] = data.get("args", "").encode("utf-8") or ""
         env["EDI_DATA_FD"] = str(data_w)
 
         log.info("Calling app %r", app)
