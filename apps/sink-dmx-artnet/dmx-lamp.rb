@@ -11,16 +11,21 @@
 
 #config
 def config
-	$subsystem = "subraum"
-	$program_path = './programs/'
-	$channel_write_interval = 0.01
-	$debug = false
-	$lamps = [2, 6, 10, 14, 18, 22, 25, 30, 34]
-	$default_colors = ["backgroundA","backgroundB","backgroundB","backgroundB","backgroundB", "green", "green", "backgroundA", "backgroundA"]
-	$server = {0=>["172.31.65.70", "172.31.64.110"], 30 => ["172.31.65.74", "172.31.65.196"], 10=>["172.31.65.70"]}
-        $server[31] = $server[30]
-        $server[11] = $server[10]
-        $server[12] = $server[10]
+  $subsystem = "subraum"
+  $program_path = './programs/'
+  $channel_write_interval = 0.01
+  $debug = false
+  $lamps = [2, 6, 10, 14, 18, 22, 25, 30, 34]
+  $default_colors = ["backgroundA","backgroundB","backgroundB","backgroundB","backgroundB", "green", "green", "backgroundA", "backgroundA"]
+  $server = {
+    0  => ["172.31.65.70", "172.31.64.110"],
+    30 => ["172.31.65.74", "172.31.65.196"],
+    10 => ["172.31.65.70"],
+  }
+  $server[31] = $server[30]
+  $server[11] = $server[10]
+  $server[12] = $server[10]
+  $quiet_time = 10
 end  #/config
 
 require "bunny"
@@ -36,58 +41,66 @@ class Artnet
     @serversocket.bind("0.0.0.0", 6454)
     @time_of_recent_message_for_universe = {}
     $server.each_pair do |universe, servers|
-      @time_of_recent_message_for_universe[universe] = Time.now - 10
+      @time_of_recent_message_for_universe[universe] = Time.now - $quiet_time
     end
-    @thread = Thread.new do forward_packets end
+    @thread = Thread.new do
+      forward_packets
+    end
   end
 
   def possibly_send(universe, maxchannel, channels)
-    @sema.synchronize {
-       return if @time_of_recent_message_for_universe[universe] + 10 > Time.now
+    @sema.synchronize do
+      return if @time_of_recent_message_for_universe[universe] + $quiet_time > Time.now
 
-       #TODO make sure the string is not unicode
-       cnt = maxchannel + 1
-       msg = "Art-Net\0\0\x50\0\0\0\0\0\0\0\x00" + "\0"*cnt
-       msg[17] = (cnt&0xff).chr
-       msg[16] = ((cnt>>8)&0xff).chr
-       msg[14] = (universe&0xff).chr  #TODO is that right
-       msg[15] = ((universe>>8)&0xff).chr
-       channels.each_pair do |channel, value|
-         msg[18+channel] = (value.to_i&0xff).chr
-       end
-       $server[universe].each do |server|
-         @socket.send(msg, 0, server, 6454)
-       end
-     }
+      #TODO make sure the string is not unicode
+      cnt = maxchannel + 1
+      msg = "Art-Net\0\0\x50\0\0\0\0\0\0\0\x00" + "\0"*cnt
+      msg[17] = (cnt&0xff).chr
+      msg[16] = ((cnt>>8)&0xff).chr
+      msg[14] = (universe&0xff).chr
+      msg[15] = ((universe>>8)&0xff).chr
+      channels.each_pair do |channel, value|
+        msg[18+channel] = (value.to_i&0xff).chr
+      end
+      $server[universe].each do |server|
+        @socket.send(msg, 0, server, 6454)
+      end
+    end
   end
 
   def forward_packets
-    puts "xyz"
-    while true
-      msgaddr = @serversocket.recvfrom(2048)
-      msg = msgaddr[0]
-      begin
-        universe = msg[14].ord | (msg[15].ord<<8)
-        puts "forwarding packet for universe #{universe}"
-        @sema.synchronize do
-          @time_of_recent_message_for_universe[universe] = Time.now
-        end
-        if $server.include? universe
-          $server[universe].each do |server|
-            @socket.send(msg, 0, server, 6454)
+    begin
+      while true
+        msgaddr = @serversocket.recvfrom(2048)
+        msg = msgaddr[0]
+        begin
+          universe = msg[14].ord | (msg[15].ord<<8)
+          puts "forwarding packet for universe #{universe}"
+          @sema.synchronize do
+            @time_of_recent_message_for_universe[universe] = Time.now
           end
+          if $server.include? universe
+            $server[universe].each do |server|
+              @socket.send(msg, 0, server, 6454)
+            end
+          end
+        rescue Interrupt
+          puts "Aborting forward_packets thread because of user interrupt"
+          break
+        rescue
+          puts "Exception in forward_packets thread: #{e}"
         end
-      rescue
       end
+    rescue Exception => e
+      puts "Fatal exception in forward_packets thread: #{e}"
+      raise e
     end
-    puts "xyz2"
   end
 end
 
 class DmxControl
   def initialize
-    @socket = UDPSocket.new
-    @sema = Mutex.new #semaphore die @serial schützt
+    @sema = Mutex.new
     @channels = {}
     @programs = {}
     @enabled = true
