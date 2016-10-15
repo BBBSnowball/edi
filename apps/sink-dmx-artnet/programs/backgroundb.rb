@@ -1,4 +1,4 @@
-class BackgroundB < Color
+class BackgroundB < ColorProgram
 	def initialize
 		@steps = [0.2, 0.3, 0.1]
 		@curVal = [ 0, 150, 50 ]

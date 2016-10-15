@@ -1,4 +1,4 @@
-class Dummy < Color
+class Dummy < ColorProgram
 
 	#Konstruktor ohne Argumente
 	def initialize

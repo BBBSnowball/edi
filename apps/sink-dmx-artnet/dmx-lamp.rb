@@ -110,14 +110,18 @@ class DmxLamp
   def initialize(universe, address, default_program)
     @universe = universe
     @address = address
-    @default_program = ColorProgram.resolve(default_program)
+    @default_program = ColorProgram.to_color_program(default_program)
     @program = @default_program
+    raise "abc" unless @program
   end
 
   attr_reader :universe, :address, :program
 
   def program=(value)
-    @program = ColorProgram.resolve(value)
+    @program = ColorProgram.to_color_program(value)
+    unless @program and @program.respond_to? :current and @program.respond_to? :next
+      raise "Invalid color: #{value}"
+    end
   end
 
   def reset_program
@@ -276,70 +280,120 @@ class DmxControl
 end
 
 class ColorProgram
-  @@colors = {}
+  def self.to_color_program(color)
+    program = to_color_program_unsafe(color)
+    unless program and program.respond_to? :current and program.respond_to? :next
+      raise "Invalid color: #{color}, #{program}"
+    end
+    return program
+  end
 
-  def self.resolve(color)
+  def self.to_color(color)
+    to_color_or_nil(color) or raise "Invalid color: #{color}"
+  end
+
+  def current
+    fail "not implemented"
+  end
+
+  def next
+    fail "not implemented"
+  end
+
+  private
+
+  def self.to_color_program_unsafe(color)
     return color if color.is_a?(ColorProgram)
-    col = simple_resolve(color)
-    return ColorProgram.new([col]) if col
+    col = to_color_or_nil(color)
+    return ConstantColorProgram.new(col) if col
     p = File.join($program_path,color+".rb")
     if File.exist?(p) && File.realpath(p).start_with?($program_path) then
       c = load_color_subclass(p)
       return c if c
     end
     p = File.join($program_path,color)
-    return ColorProgram.new(p) if File.exist?(p) && File.realpath(p).start_with?($program_path)
+    if File.exist?(p) && File.realpath(p).start_with?($program_path)
+      return ColorProgram.from_file(p)
+    end
     fail "Unbekannte Farbe: #{color}"
   end
-  def self.simple_resolve(color)
-    color.downcase!
-    return @@colors[color] if @@colors.include?(color)
+
+  def self.to_color_or_nil(color)
+    if color.is_a?(String)
+      color.downcase!
+      load_colors unless @@colors
+      return @@colors[color] || parse_color(color)
+    else
+      return color.map { |e| e.to_i }
+    end
+  end
+
+  def self.parse_color(color)
     m = /(\d+),(\d+),(\d+)/.match(color)
     return m[1..3].map{|e| e.to_i} if m
     m = /#([a-fA-F0-9]{2})([a-fA-F0-9]{2})([a-fA-F0-9]{2})/.match(color)
     return m[1..3].map{|e| e.to_i(16)} if m
     JSON.load(color)[0..2].map{ |e| e.to_i } rescue nil
   end
+  
   def self.load_color_subclass(path)
     begin
       c = eval(IO.read(path)).new
       puts "loaded Class #{c.class.name} from #{path}"
       return c
     rescue
+      puts "Error in #{path}:"
       puts $!
       puts $@
     end
   end
+
   def self.load_colors
     @@colors = Hash[File.open('colors.txt').each_line.map do |line|
       m = /([^ ]+)\s+(#[a-fA-F0-9]{6})/.match(line)
-      [m[1].downcase, simple_resolve(m[2])] if m
+      [m[1].downcase, parse_color(m[2])] if m
     end.compact]
   end
+end
 
+class ConstantColorProgram < ColorProgram
+  def initialize(color)
+    @color = color
+  end
+
+  def current
+    @color
+  end
+
+  def next
+  end
+end
+
+class ColorListProgram < ColorProgram
   def initialize(colors)
-    if colors.is_a? String
-      @colors = []
-      @index = 0
-      File.open(colors).each do |line|
-        c = ColorProgram.simple_resolve(line.strip)
-        @colors << c if c
-      end
-      puts "loaded Program #{colors} with #{@colors.length} lines"
-    else
-      @colors = colors.map { |l| l.map { |e| e.to_i } }
-      @index = 0
-    end
+    @colors = colors.map { |l| ColorProgram.to_color l }
+    @index = 0
     fail "Hab keine Farben!" if @colors.length == 0
   end
+
+  def self.from_file(path)
+    colors = []
+    File.open(colors).each do |line|
+      c = ColorProgram.to_color(line.strip)
+      colors << c if c
+    end
+    puts "loaded Program #{colors} with #{@colors.length} lines"
+    return ColorListProgram.new(colors)
+  end
+
   def current
     return @colors[@index]
   end
+
   def next
     @index = (@index + 1) % @colors.length
   end
 end
-Color = ColorProgram
 
 class EdiClient
   def initialize(dmx_control, host, routing_key_prefix)
@@ -371,7 +425,7 @@ class EdiClient
     else
       lamp = rk
       begin
-        program = ColorProgram.resolve(data)
+        program = ColorProgram.to_color_program(data)
         puts "Setting #{lamp} to #{program}"
         @dmx_control.setprogram(lamp.to_i, program)
       rescue => err
