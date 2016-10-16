@@ -8,7 +8,7 @@
 def config
   $subsystem = "subraum"
   $program_path = './programs/'
-  $channel_write_interval = 0.01
+  $channel_write_interval = 0.05
   $debug = false
   $server = {
     0      => ["172.31.65.70", "172.31.64.110"],
@@ -24,6 +24,7 @@ def config
     end
   end
   $quiet_time = 10
+  $universe_order = {11 => 100}
 end  #/config
 
 def config_lamps(c)
@@ -282,7 +283,9 @@ class DmxUniverses
   end
 
   def each
-    @universes.each_value do |obj|
+    in_order = @universes.values.sort_by {|u| $universe_order[u.id] || u.id}
+    #puts in_order.map {|x| x.id}.inspect
+    in_order.each do |obj|
       yield obj
     end
   end
