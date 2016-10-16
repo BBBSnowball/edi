@@ -12,7 +12,8 @@ def config
   $debug = false
   $server = {
     0      => ["172.31.65.70", "172.31.64.110"],
-    30..31 => ["172.31.65.74", "172.31.65.196"],
+    30..31 => ["172.31.65.74"],
+    32..33 => ["172.31.65.196"],
     10..12 => ["172.31.65.70"],
   }
   $server.keys.to_a.each do |key|
@@ -37,9 +38,9 @@ def config_lamps(c)
   c.add_lamp(30, 0, 30, "backgroundA")
   c.add_lamp(34, 0, 34, "backgroundA")
 
-  c.add_stripe(100, 10, 500, "backgroundA")
+  c.add_stripe(100, 10, 444, "backgroundA")
   c.add_stripe(101, 30, 189, "backgroundA")
-  c.add_stripe(102, 32, 200, "backgroundA")
+  c.add_stripe(102, 32, 225, "backgroundA")
 end
 
 require "bunny"
