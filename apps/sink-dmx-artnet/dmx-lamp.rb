@@ -144,9 +144,7 @@ class DmxLamp
 
   def update_channels(channels)
     channels[@address-1] = 0
-    @program.current.each_with_index do |value, index|
-      channels[@address+index] = [value, 0, 255].sort[1]
-    end
+    channels.set_rgb(@address+0, @program.current)
     channels[@address+3] = 0
   end
 end
@@ -168,16 +166,16 @@ class DmxStripePartForUniverse
 
   def update_channels(channels)
     @led_count.times do |led_index|
-      #TODO different color for each LED
-      @stripe.program.current.each_with_index do |value, index|
-        channels[3*led_index+index] = [value, 0, 255].sort[1]
-      end
+      color = @stripe.program.current_at_index(@offset_in_stripe+led_index, @stripe.length)
+      channels.set_rgb(3*led_index, color)
     end
   end
 end
 
 class DmxStripe
   def initialize(start_universe, led_count, default_program)
+    @length = led_count
+
     @parts = []
     leds_per_universe = 512/3
     offset = 0
@@ -187,14 +185,14 @@ class DmxStripe
       offset += leds_per_universe
     end
 
-    @default_program = ColorProgram.to_color_program(default_program)
+    @default_program = ColorProgram.to_color_program_for_stripe(default_program)
     @program = @default_program
   end
 
-  attr_reader :parts, :program
+  attr_reader :parts, :program, :length
 
   def program=(value)
-    @program = ColorProgram.to_color_program(value)
+    @program = ColorProgram.to_color_program_for_stripe(value)
   end
 
   def reset_program
@@ -222,7 +220,13 @@ class Channels
   end
 
   def []=(index, value)
-    @data[index] = value.to_i.chr
+    @data[index] = [value.to_i, 0, 255].sort[1].chr
+  end
+
+  def set_rgb(offset, color)
+    color.each_with_index do |value, index|
+      self[offset+index] = [value, 0, 255].sort[1]
+    end
   end
 end
 
@@ -351,6 +355,14 @@ class DmxControl
 end
 
 class ColorProgram
+  def self.to_color_program_for_stripe(color)
+    program = to_color_program(color)
+    unless program.respond_to? :current_at_index
+      program = RepeatColorForStripe.new(program)
+    end
+    return program
+  end
+
   def self.to_color_program(color)
     program = to_color_program_unsafe(color)
     unless program and program.respond_to? :current and program.respond_to? :next
@@ -463,6 +475,52 @@ class ColorListProgram < ColorProgram
 
   def next
     @index = (@index + 1) % @colors.length
+  end
+end
+
+class ColorProgramDecorator < ColorProgram
+  def initialize(program)
+    @program = ColorProgram.to_color_program(program)
+    init
+  end
+
+  def init
+  end
+
+  def current
+    @program.current
+  end
+
+  def next
+    @program.next
+  end
+end
+
+class RepeatColorForStripe < ColorProgramDecorator
+  def current_at_index(index, all_led_count)
+    current
+  end
+end
+
+class RunColorOverStripe < ColorProgramDecorator
+  def init
+    @pointer = 0
+    @ringbuffer = [current]
+  end
+
+  def current_at_index(index, all_led_count)
+    while @ringbuffer.length < all_led_count
+      @ringbuffer << current.clone
+      @program.next
+    end
+    
+    @ringbuffer[(@pointer+index) % @ringbuffer.length]
+  end
+
+  def next
+    super
+    @pointer = (@pointer-1) % @ringbuffer.length
+    @ringbuffer[@pointer] = current
   end
 end
 

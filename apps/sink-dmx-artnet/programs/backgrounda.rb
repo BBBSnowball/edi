@@ -22,5 +22,11 @@ class BackgroundA < ColorProgram
 			end
 		}
 	end
+
+	def self.new
+		obj = self.allocate
+		obj.send :initialize
+		return RunColorOverStripe.new(obj)
+	end
 end
 BackgroundA
