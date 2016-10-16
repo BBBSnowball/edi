@@ -128,6 +128,7 @@ class DmxLamp
   attr_reader :universe, :address, :program
 
   def program=(value)
+    @program.dispose if @program and @program.respond_to? :dispose
     @program = ColorProgram.to_color_program(value)
   end
 
@@ -193,6 +194,7 @@ class DmxStripe
   attr_reader :parts, :program, :length
 
   def program=(value)
+    @program.dispose if @program and @program.respond_to? :dispose
     @program = ColorProgram.to_color_program_for_stripe(value)
   end
 
@@ -367,13 +369,18 @@ class ColorProgram
   def self.to_color_program(color)
     program = to_color_program_unsafe(color)
     unless program and program.respond_to? :current and program.respond_to? :next
-      raise "Invalid color: #{color} -> #{program}"
+      raise "Invalid color: #{color.inspect} -> #{program}"
     end
     return program
   end
 
   def self.to_color(color)
-    to_color_or_nil(color) or raise "Invalid color: #{color}"
+    c = to_color_or_nil(color)
+    if c
+      return c
+    else
+      raise "Invalid color: #{color.inspect}"
+    end
   end
 
   def current
@@ -398,6 +405,10 @@ class ColorProgram
     p = File.join($program_path,color)
     if File.exist?(p) && File.realpath(p).start_with?($program_path)
       return ColorProgram.from_file(p)
+    end
+    p = File.join($program_path,color+".bin")
+    if File.exist?(p) && File.realpath(p).start_with?($program_path) then
+      return RunColorOverStripe.new(ExternalProgram.new(p))
     end
     fail "Unbekannte Farbe: #{color}"
   end
@@ -476,6 +487,36 @@ class ColorListProgram < ColorProgram
 
   def next
     @index = (@index + 1) % @colors.length
+  end
+end
+
+class ExternalProgram < ColorProgram
+  def initialize(command)
+    @command = command
+    @stdout, wout = IO.pipe
+    @pid = Process.spawn(command, :out => wout)
+    @current = [0, 0, 0]
+    self.next
+  end
+
+  def current
+    @current
+  end
+
+  def next
+    begin
+      Timeout::timeout(0.1) do
+        @current = ColorProgram.to_color(@stdout.gets.strip)
+      end
+    rescue Timeout::Error
+      puts "Process '#{@command}' is too slow."
+    rescue
+      puts "Error while reading from '#{@command}': #{$!}"
+    end
+  end
+
+  def dispose
+    Process.kill(@pid)
   end
 end
 

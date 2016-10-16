@@ -1,0 +1,6 @@
+#!/bin/sh
+while true ; do
+	echo red
+	echo green
+	echo blue
+done
