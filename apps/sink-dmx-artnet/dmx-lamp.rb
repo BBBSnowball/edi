@@ -511,12 +511,27 @@ class ExternalProgram < ColorProgram
     rescue Timeout::Error
       puts "Process '#{@command}' is too slow."
     rescue
-      puts "Error while reading from '#{@command}': #{$!}"
+      puts "Error while reading from '#{@command}': #{$!}\n#{$@}"
     end
   end
 
   def dispose
-    Process.kill(@pid)
+    puts "Disposing process with pid #{@pid}, command '#{@command}'"
+    Process.kill(:SIGTERM, @pid)
+    begin
+      Timeout::timeout(1) do
+        Process.wait(@pid)
+      end
+    rescue Timeout::Error
+      puts "Process #{@pid} needs kill."
+      Process.kill(:SIGKILL, @pid)
+      begin
+        Timeout::timeout(1) do
+          Process.wait(@pid)
+        end
+      rescue Timeout::Error
+      end
+    end
   end
 end
 
@@ -535,6 +550,10 @@ class ColorProgramDecorator < ColorProgram
 
   def next
     @program.next
+  end
+
+  def dispose
+    @program.dispose if @program.respond_to? :dispose
   end
 end
 
@@ -599,8 +618,8 @@ class EdiClient
         program = ColorProgram.to_color_program(data)
         puts "Setting #{lamp} to #{program}"
         @dmx_control.setprogram(lamp.to_i, program)
-      rescue => err
-        puts "Error while handling message with rk=#{rk.inspect}, data=#{data.inspect}: #{err}"
+      rescue
+        puts "Error while handling message with rk=#{rk.inspect}, data=#{data.inspect}: #{$!}\n#{$@}"
       end
     end
   end
