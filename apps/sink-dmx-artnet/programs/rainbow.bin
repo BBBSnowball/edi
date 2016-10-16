@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+
+# see https://git.c3pb.de/c3pb/artbow/edit/master/bow.py
+
+import math
+
+#TODO should be a parameter, but dmx-lamp doesn't support that, yet
+RAINBOW_LENGTH = 500
+
+def sinebow(h):
+    h += 1/2
+    h *= -1
+    r = math.sin(math.pi * h)
+    g = math.sin(math.pi * (h + 1/3))
+    b = math.sin(math.pi * (h + 2/3))
+    return [int(255*chan**2) for chan in (r, g, b)]
+
+led = 0
+while True:
+    print(repr(sinebow(led*1.0/RAINBOW_LENGTH)))
+    led = (led+1) % RAINBOW_LENGTH
