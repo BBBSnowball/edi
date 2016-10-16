@@ -1,13 +1,8 @@
 #!/usr/bin/env ruby
 # encoding: UTF-8
 
-#TODO Farbprogramme
-#TODO testen, ob enabled/disabled state auch regelmäßig aufs dmx geschrieben werden muss
-
 #key dmx.lamp.subraum.control, body ~= (on|off)
 #key dmx.lamp.subraum.0, body ~= (\d,\d,\d|html-farbe|programmname)
-
-#Lampenids: 8, 24, 96
 
 #config
 def config
@@ -37,6 +32,10 @@ def config_lamps(c)
   c.add_lamp(25, 0, 25, "green")
   c.add_lamp(30, 0, 30, "backgroundA")
   c.add_lamp(34, 0, 34, "backgroundA")
+
+  c.add_stripe(100, 10, 500, "backgroundA")
+  c.add_stripe(101, 30, 189, "backgroundA")
+  c.add_stripe(102, 32, 200, "backgroundA")
 end
 
 require "bunny"
@@ -61,7 +60,8 @@ class Artnet
 
   def possibly_send(universe)
     @sema.synchronize do
-      return if @time_of_recent_message_for_universe[universe.id] + $quiet_time > Time.now
+      return if @time_of_recent_message_for_universe[universe.id] \
+        and @time_of_recent_message_for_universe[universe.id] + $quiet_time > Time.now
       return unless $server[universe.id]
 
       channels = universe.channel_data
@@ -112,16 +112,12 @@ class DmxLamp
     @address = address
     @default_program = ColorProgram.to_color_program(default_program)
     @program = @default_program
-    raise "abc" unless @program
   end
 
   attr_reader :universe, :address, :program
 
   def program=(value)
     @program = ColorProgram.to_color_program(value)
-    unless @program and @program.respond_to? :current and @program.respond_to? :next
-      raise "Invalid color: #{value}"
-    end
   end
 
   def reset_program
@@ -142,6 +138,61 @@ class DmxLamp
       channels[@address+index] = [value, 0, 255].sort[1]
     end
     channels[@address+3] = 0
+  end
+end
+
+class DmxStripePartForUniverse
+  def initialize(universe, offset_in_stripe, led_count, stripe)
+    raise Exception("illegal argument stripe: #{stripe.inspect}") unless stripe.is_a? DmxStripe
+    @universe = universe
+    @offset_in_stripe = offset_in_stripe
+    @led_count = led_count
+    @stripe = stripe
+  end
+
+  attr_reader :universe, :offset_in_stripe, :led_count, :stripe
+
+  def maxchannel
+    @led_count*3-1
+  end
+
+  def update_channels(channels)
+    @led_count.times do |led_index|
+      #TODO different color for each LED
+      @stripe.program.current.each_with_index do |value, index|
+        channels[3*led_index+index] = [value, 0, 255].sort[1]
+      end
+    end
+  end
+end
+
+class DmxStripe
+  def initialize(start_universe, led_count, default_program)
+    @parts = []
+    leds_per_universe = 512/3
+    offset = 0
+    ((led_count+leds_per_universe-1)/leds_per_universe).times do |i|
+      @parts << DmxStripePartForUniverse.new(start_universe+i,
+        offset, [led_count-offset, leds_per_universe].min, self)
+      offset += leds_per_universe
+    end
+
+    @default_program = ColorProgram.to_color_program(default_program)
+    @program = @default_program
+  end
+
+  attr_reader :parts, :program
+
+  def program=(value)
+    @program = ColorProgram.to_color_program(value)
+  end
+
+  def reset_program
+    @program = @default_program
+  end
+
+  def advance_program
+    @program.next
   end
 end
 
@@ -241,6 +292,16 @@ class DmxControl
     end
   end
 
+  def add_stripe(id, start_universe, led_count, default_program)
+    @sema.synchronize do
+      stripe = DmxStripe.new(start_universe, led_count, default_program)
+      @lamps[id] = stripe
+      stripe.parts.each do |part|
+        @universes << part
+      end
+    end
+  end
+
   def on
     @sema.synchronize do
       @lamps.each_pair do |lampid, lamp|
@@ -283,7 +344,7 @@ class ColorProgram
   def self.to_color_program(color)
     program = to_color_program_unsafe(color)
     unless program and program.respond_to? :current and program.respond_to? :next
-      raise "Invalid color: #{color}, #{program}"
+      raise "Invalid color: #{color} -> #{program}"
     end
     return program
   end
