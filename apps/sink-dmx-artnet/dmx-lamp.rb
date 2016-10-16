@@ -11,13 +11,17 @@ def config
   $channel_write_interval = 0.01
   $debug = false
   $server = {
-    0  => ["172.31.65.70", "172.31.64.110"],
-    30 => ["172.31.65.74", "172.31.65.196"],
-    10 => ["172.31.65.70"],
+    0      => ["172.31.65.70", "172.31.64.110"],
+    30..31 => ["172.31.65.74", "172.31.65.196"],
+    10..12 => ["172.31.65.70"],
   }
-  $server[31] = $server[30]
-  $server[11] = $server[10]
-  $server[12] = $server[10]
+  $server.keys.to_a.each do |key|
+    if key.is_a? Range
+      key.each do |key2|
+        $server[key2] = $server[key]
+      end
+    end
+  end
   $quiet_time = 10
 end  #/config
 
