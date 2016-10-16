@@ -50,6 +50,7 @@ require "json"
 class Artnet
   def initialize
     @socket = UDPSocket.new
+    @sockets = {}
     @sema = Mutex.new
     @serversocket = UDPSocket.new
     @serversocket.bind("0.0.0.0", 6454)
@@ -74,8 +75,13 @@ class Artnet
       msg[16] = ((channels.length>>8)&0xff).chr
       msg[14] = (universe.id&0xff).chr
       msg[15] = ((universe.id>>8)&0xff).chr
-      $server[universe.id].each do |server|
-        @socket.send(msg, 0, server, 6454)
+      $server[universe.id].each_with_index do |server, index|
+        x = 20000 + universe.id*10 + index
+        unless @sockets[x]
+          @sockets[x] = UDPSocket.new
+          @sockets[x].bind("0.0.0.0", x)
+        end
+        @sockets[x].send(msg, 0, server, 6454)
       end
     end
   end
