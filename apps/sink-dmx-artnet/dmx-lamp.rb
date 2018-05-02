@@ -24,7 +24,7 @@ def config
     end
   end
   $quiet_time = 10
-  $universe_order = {11 => 100}
+  $universe_order = {11 => -1, 10 => 100}
 end  #/config
 
 def config_lamps(c)

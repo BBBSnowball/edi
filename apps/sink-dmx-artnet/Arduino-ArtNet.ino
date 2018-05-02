@@ -18,6 +18,7 @@ This example has been modified and extended:
 #define LEDS_PER_UNIVERSE (512/3)
 #define LEDS_STRIPE1 (LEDS_PER_UNIVERSE*3)
 #define LEDS_STRIPE2 (LEDS_PER_UNIVERSE*3)
+#define LEDS_STRIPE3 (LEDS_PER_UNIVERSE*3)
 
 //#define DEBUG
 
@@ -35,6 +36,11 @@ byte mac[] = {0x04, 0xE9, 0xE5, 0x00, 0x69, 0xEC};
 
 Adafruit_NeoPixel ledstripe1 = Adafruit_NeoPixel(LEDS_STRIPE1, 4, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel ledstripe2 = Adafruit_NeoPixel(LEDS_STRIPE2, 5, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ledstripe3 = Adafruit_NeoPixel(LEDS_STRIPE3, 6, NEO_GRB + NEO_KHZ800);
+
+#define PWM_OFFSET 22
+
+const uint8_t pwmPins[] = {8, 9, 7, 11, 12, 13};
 
 void setup()
 {
@@ -49,14 +55,21 @@ void setup()
   }
 
   ledstripe1.begin();
+  ledstripe1.setPixelColor(0, ledstripe2.Color(100, 200, 50));
+  for (int i=0;i<LEDS_STRIPE1;i++) {
+    ledstripe1.setPixelColor(i, ledstripe2.Color(100, 200, 50));
+  }
   ledstripe1.show();
   ledstripe2.begin();
   ledstripe2.setPixelColor(0, ledstripe2.Color(100, 200, 50));
   ledstripe2.show();
+  ledstripe3.begin();
+  ledstripe3.setPixelColor(0, ledstripe2.Color(100, 200, 50));
+  ledstripe3.show();
 
-  for (int i=8;i<=13;i++) {
-    pinMode(i, OUTPUT);
-    digitalWrite(i, HIGH);
+  for (int i=0;i<sizeof(pwmPins)/sizeof(*pwmPins);i++) {
+    pinMode(pwmPins[i], OUTPUT);
+    analogWrite(pwmPins[i], 255-150);
   }
   
   Serial.println(F("done"));
@@ -77,7 +90,7 @@ void setFromDmx(Adafruit_NeoPixel& ledstripe, int offset, int ledstripeLength) {
   for (int i=0;i<512 && i < artnet.getLength() && i/3+offset<ledstripeLength;i+=3) {
     uint32_t c = ledstripe.Color(artnet.getDmxFrame()[i+0],
       artnet.getDmxFrame()[i+1], artnet.getDmxFrame()[i+2]);
-      ledstripe.setPixelColor(i/3+offset, c);
+    ledstripe.setPixelColor(i/3+offset, c);
   }
   Serial.print("sending data to LED stripe...\t");
   ledstripe.show();
@@ -112,19 +125,22 @@ void loop()
         for (int i=0;i<512 && i < artnet.getLength();i++) {
           DMXSerial.write(i, artnet.getDmxFrame()[i]);
         }
-        if (artnet.getLength() > 27) {
-          for (int i=0;i<6;i++) {
-            pinMode(8+i, OUTPUT);
-            analogWrite(8+i, 255-artnet.getDmxFrame()[22+i]);
-          }
+        for (int i=0;i<sizeof(pwmPins)/sizeof(*pwmPins) && PWM_OFFSET+i<artnet.getLength();i++) {
+          analogWrite(pwmPins[i], 255-artnet.getDmxFrame()[PWM_OFFSET+i]);
         }
         break;
+
       case 10: setFromDmx(ledstripe1, 0*LEDS_PER_UNIVERSE, LEDS_STRIPE1); break;
       case 11: setFromDmx(ledstripe1, 1*LEDS_PER_UNIVERSE, LEDS_STRIPE1); break;
       case 12: setFromDmx(ledstripe1, 2*LEDS_PER_UNIVERSE, LEDS_STRIPE1); break;
+
       case 20: setFromDmx(ledstripe2, 0*LEDS_PER_UNIVERSE, LEDS_STRIPE2); break;
       case 21: setFromDmx(ledstripe2, 1*LEDS_PER_UNIVERSE, LEDS_STRIPE2); break;
       case 22: setFromDmx(ledstripe2, 2*LEDS_PER_UNIVERSE, LEDS_STRIPE2); break;
+
+      case 30: setFromDmx(ledstripe3, 0*LEDS_PER_UNIVERSE, LEDS_STRIPE3); break;
+      case 31: setFromDmx(ledstripe3, 1*LEDS_PER_UNIVERSE, LEDS_STRIPE3); break;
+      case 32: setFromDmx(ledstripe3, 2*LEDS_PER_UNIVERSE, LEDS_STRIPE3); break;
     }
   }
 }
